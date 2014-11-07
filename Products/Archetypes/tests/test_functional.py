@@ -29,7 +29,6 @@ from plone.app.testing import SITE_OWNER_PASSWORD
 from plone.app.testing import TEST_USER_PASSWORD
 from Products.Archetypes.tests.attestcase import ATTestCase
 from plone.protect import createToken
-from plone.testing.z2 import Browser
 
 from StringIO import StringIO
 
@@ -186,9 +185,9 @@ class TestFunctionalObjectCreation(ATTestCase):
         # This is functional so that we get a full request and set the flag
 
         # create an object with flag set
-        response = self.publish(self.folder_path +
-                              '/invokeFactory?type_name=DDocument&id=new_doc',
-                              self.basic_auth)
+        self.publish(self.folder_path +
+                     '/invokeFactory?type_name=DDocument&id=new_doc',
+                     self.basic_auth)
         self.assertTrue('new_doc' in self.folder.objectIds())
         new_obj = self.folder.new_doc
         self.assertTrue(new_obj.checkCreationFlag())  # object is not yet edited
@@ -250,3 +249,20 @@ class TestFunctionalObjectCreation(ATTestCase):
 
         res = self.publish('/plone/test/at_download/file')
         self.assertEqual(res.status, 401)
+
+    def test_webdav_btree_folder(self):
+        portal = self.layer['portal']
+        self.setRoles(['Manager'])
+        portal.invokeFactory('SimpleBTreeFolder', 'simple_btree_folder')
+        portal.invokeFactory('DDocument', 'index_html', title='Root Index')
+        folder = portal.simple_btree_folder
+        self.assertNotIn('index_html', folder.objectIds())
+        self.assertEqual(str(folder.index_html), "<DDocument at index_html>")
+        response = self.publish("/plone/simple_btree_folder/index_html",
+                                basic=self.basic_auth,
+                                request_method="PUT",
+                                stdin=StringIO('Simple BTree Folder Index'))
+        self.assertEqual(response.getStatus(), 201)
+        self.assertIn('index_html', folder.objectIds())
+        self.assertEqual(folder.index_html.title_or_id(), 'index_html')
+        self.assertEqual(str(folder.index_html.body()).strip(), 'Simple BTree Folder Index')
